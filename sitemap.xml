@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://lab-work-space.github.io/</loc></url>
+  <url><loc>https://lab-work-space.github.io/crewlatch/</loc></url>
+  <url><loc>https://lab-work-space.github.io/guides/bounding-box-formats/</loc></url>
+  <url><loc>https://lab-work-space.github.io/guides/check-yolo-dataset/</loc></url>
+  <url><loc>https://lab-work-space.github.io/guides/claude-code-staged-workflow/</loc></url>
+  <url><loc>https://lab-work-space.github.io/guides/train-val-leakage/</loc></url>
+  <url><loc>https://lab-work-space.github.io/guides/yolo-label-format-errors/</loc></url>
+  <url><loc>https://lab-work-space.github.io/labelfence/</loc></url>
+</urlset>

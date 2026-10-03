@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Labelfence: audit a YOLO dataset before you train</title>
+<meta name="description" content="Labelfence is a command-line tool that checks every image and label file of a YOLO dataset and exits with a code a script can test. The lite edition is free.">
+<link rel="canonical" href="https://lab-work-space.github.io/labelfence/">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to the text</a>
+<div class="frame">
+<div class="sheet">
+<header class="sheethead"><a class="brand" href="../">Labworkspace</a></header>
+<main id="content">
+<div class="column">
+<header class="pagehead"><div class="prose">
+<h1 id="labelfence">Labelfence</h1>
+<p>Labelfence is a command-line tool that audits object-detection datasets before you train on them. The lite edition is free and reads datasets in YOLO format. It prints what it found, writes a JSON report, and exits with a code a script can test. It runs offline and never changes your dataset.</p>
+</div><figure class="drawing" role="img" aria-label="Line drawing: boxes inside an image frame, one dashed box leaving the frame, and one picture on both sides of a train and val fence."><svg viewBox="-4 0 600 420" aria-hidden="true" focusable="false"><rect x="40" y="30" width="420" height="270" fill="none" stroke="#8FA3B8" stroke-width="1.6"/><path d="M28 30 H52 M40 18 V42" stroke="#8FA3B8" stroke-width="1"/><path d="M448 30 H472 M460 18 V42" stroke="#8FA3B8" stroke-width="1"/><path d="M28 300 H52 M40 288 V312" stroke="#8FA3B8" stroke-width="1"/><path d="M448 300 H472 M460 288 V312" stroke="#8FA3B8" stroke-width="1"/><rect x="80" y="70" width="130" height="110" fill="none" stroke="#14213D" stroke-width="2.2"/><rect x="80" y="50" width="49" height="20" fill="#14213D"/><text x="88" y="65" font-family="'DIN Alternate', 'DIN 2014', Bahnschrift, 'Roboto Condensed', 'Arial Narrow', sans-serif" font-size="15" fill="#F3F5F7">cat</text><circle cx="210" cy="70" r="11" fill="#F3F5F7" stroke="#1F7A5C" stroke-width="2.2"/><path d="M205.4 70.2 l3.3 3.5 l6.1 -6.8" fill="none" stroke="#1F7A5C" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><rect x="250" y="150" width="110" height="120" fill="none" stroke="#14213D" stroke-width="2.2"/><rect x="250" y="130" width="49" height="20" fill="#14213D"/><text x="258" y="145" font-family="'DIN Alternate', 'DIN 2014', Bahnschrift, 'Roboto Condensed', 'Arial Narrow', sans-serif" font-size="15" fill="#F3F5F7">dog</text><circle cx="360" cy="150" r="11" fill="#F3F5F7" stroke="#1F7A5C" stroke-width="2.2"/><path d="M355.4 150.2 l3.3 3.5 l6.1 -6.8" fill="none" stroke="#1F7A5C" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><rect x="390" y="60" width="130" height="80" fill="none" stroke="#14213D" stroke-width="2.2" stroke-dasharray="7 6"/><path d="M500 142 L510 176" stroke="#8FA3B8" stroke-width="1" fill="none"/><text x="516" y="192" font-family="'DIN Alternate', 'DIN 2014', Bahnschrift, 'Roboto Condensed', 'Arial Narrow', sans-serif" font-size="15" fill="#8FA3B8" text-anchor="middle" letter-spacing="0.4">box leaves</text><text x="516" y="210" font-family="'DIN Alternate', 'DIN 2014', Bahnschrift, 'Roboto Condensed', 'Arial Narrow', sans-serif" font-size="15" fill="#8FA3B8" text-anchor="middle" letter-spacing="0.4">the image</text><path d="M260 324 V416" stroke="#14213D" stroke-width="2"/><path d="M254 330 H266" stroke="#14213D" stroke-width="1.4"/><path d="M254 344 H266" stroke="#14213D" stroke-width="1.4"/><path d="M254 358 H266" stroke="#14213D" stroke-width="1.4"/><path d="M254 372 H266" stroke="#14213D" stroke-width="1.4"/><path d="M254 386 H266" stroke="#14213D" stroke-width="1.4"/><path d="M254 400 H266" stroke="#14213D" stroke-width="1.4"/><path d="M254 414 H266" stroke="#14213D" stroke-width="1.4"/><rect x="150" y="350" width="70" height="48" fill="none" stroke="#14213D" stroke-width="1.8"/><path d="M158 388 l16 -18 l12 12 l10 -8 l16 14" fill="none" stroke="#8FA3B8" stroke-width="1.4"/><rect x="300" y="350" width="70" height="48" fill="none" stroke="#14213D" stroke-width="1.8"/><path d="M308 388 l16 -18 l12 12 l10 -8 l16 14" fill="none" stroke="#8FA3B8" stroke-width="1.4"/><path d="M224 370 H296 M224 378 H296" stroke="#8FA3B8" stroke-width="1.4"/><text x="185" y="340" font-family="'DIN Alternate', 'DIN 2014', Bahnschrift, 'Roboto Condensed', 'Arial Narrow', sans-serif" font-size="16" fill="#14213D" text-anchor="middle" letter-spacing="0.4">train</text><text x="335" y="340" font-family="'DIN Alternate', 'DIN 2014', Bahnschrift, 'Roboto Condensed', 'Arial Narrow', sans-serif" font-size="16" fill="#14213D" text-anchor="middle" letter-spacing="0.4">val</text><text x="392" y="372" font-family="'DIN Alternate', 'DIN 2014', Bahnschrift, 'Roboto Condensed', 'Arial Narrow', sans-serif" font-size="15" fill="#8FA3B8" text-anchor="start" letter-spacing="0.4">same picture</text><text x="392" y="390" font-family="'DIN Alternate', 'DIN 2014', Bahnschrift, 'Roboto Condensed', 'Arial Narrow', sans-serif" font-size="15" fill="#8FA3B8" text-anchor="start" letter-spacing="0.4">on both sides</text></svg></figure></header>
+<article class="prose">
+<h2 id="what-the-lite-edition-checks">What the lite edition checks</h2>
+<p>It reads three YOLO layouts: <code>images/&lt;split&gt;/</code> with <code>labels/&lt;split&gt;/</code> (the Ultralytics layout), <code>&lt;split&gt;/images/</code> with <code>&lt;split&gt;/labels/</code>, and a flat <code>images/</code> with <code>labels/</code>. A <code>data.yaml</code> with <code>names</code> and <code>nc</code> is read when it exists.</p>
+<p>For every label line it checks the field count, the numbers, the class id, that the box lies inside the image, that it has a size, and that it is not repeated. For every image it checks that the file is readable, its size, its extension, its name, and that a label file exists.</p>
+<p>The lite edition reports 20 kinds of finding, each with a stable code: 9 codes starting with <code>E_</code> are errors and 11 starting with <code>W_</code> are warnings. Examples are <code>E_BOX_OUT_OF_RANGE</code>, <code>E_CLASS_ID_INVALID</code>, <code>W_IMAGE_WITHOUT_LABEL</code> and <code>W_CLASS_IMBALANCE</code>. <code>labelfence stats</code> prints counts per split and per class.</p>
+<h2 id="install">Install</h2>
+<p>You need Python 3.10 or newer, git and a network connection. Install into a virtual environment:</p>
+<pre tabindex="0"><code>python3 -m venv .venv
+. .venv/bin/activate
+pip install "git+https://github.com/Lab-Work-Space/labelfence-lite@v1.0.0"</code></pre>
+<p>Check the install:</p>
+<pre tabindex="0" class="command"><code>labelfence --version</code></pre>
+<pre tabindex="0" class="output"><code>labelfence 1.0.0</code></pre>
+<p>To remove it later, run <code>pip uninstall -y labelfence</code>.</p>
+<h2 id="quick-start">Quick start</h2>
+<p><code>labelfence sample</code> writes a small synthetic dataset to try the tool on. The case <code>faulty</code> holds one example of every code the lite edition reports.</p>
+<pre tabindex="0" class="command"><code>labelfence sample --out demo --case faulty</code></pre>
+<p>Audit it:</p>
+<pre tabindex="0" class="command"><code>labelfence audit demo</code></pre>
+<p>The command prints a summary and the findings grouped by code, writes <code>demo-audit.json</code> in the current folder, and exits with code 3 because the dataset has errors. These are some of the lines it prints, summary first; the last line goes to standard error:</p>
+<pre tabindex="0" class="output"><code>Labelfence 1.0.0: demo
+Format: yolo (layout: ultralytics)
+Images: 23  Boxes: 91  Classes: 4
+  train: 23 images, 91 boxes, 3 without boxes
+Findings: 9 errors, 12 warnings
+  E_BOX_OUT_OF_RANGE: 1
+  W_IMAGE_NAME_COLLISION: 2
+E_BOX_OUT_OF_RANGE (1): a box value is outside the image or outside 0 to 1
+  labels/train/outofrange.txt:2  line 2: field 4 is outside 0 to 1.
+labelfence: error: the audit found 9 errors.</code></pre>
+<p>Exit code 3 with that last line is the expected result for a dataset that has errors: it is how a script learns that the audit found something, not a failure of the tool.</p>
+<p>The case <code>clean</code> has no finding, and the audit exits with code 0:</p>
+<pre tabindex="0" class="command"><code>labelfence sample --out clean --case clean
+labelfence audit clean</code></pre>
+<pre tabindex="0" class="output"><code>Findings: 0 errors, 0 warnings</code></pre>
+<p>Audit your own dataset the same way, with <code>labelfence audit path/to/dataset</code>. Add <code>--strict</code> to exit with code 3 on warnings as well, and <code>--quiet</code> to print the summary only. Pass <code>--report FILE</code> to choose where the JSON report goes.</p>
+<h2 id="exit-codes">Exit codes</h2>
+<div class="table-wrap" role="region" aria-label="Table" tabindex="0"><table><thead><tr><th>Code</th><th>Meaning</th></tr></thead><tbody><tr><td>0</td><td>No finding, or warnings only</td></tr><tr><td>1</td><td>Unexpected error</td></tr><tr><td>2</td><td>Usage error, a command that belongs to the full edition, or an output that cannot be written</td></tr><tr><td>3</td><td>The audit found errors (or warnings with <code>--strict</code>)</td></tr><tr><td>5</td><td>Unsupported or invalid input: not a dataset, or a layout that cannot be read</td></tr><tr><td>130</td><td>Interrupted; temporary files are removed</td></tr></tbody></table></div>
+<h2 id="what-the-lite-edition-does-not-do">What the lite edition does not do</h2>
+<ul><li>It reads the header of an image and does not decode it. A JPEG that is cut off after its header is not found.</li><li>It reads YOLO datasets and boxes only. A polygon label is a finding unless you pass <code>--allow-polygons</code>, which takes the bounding box of the polygon.</li><li>It never modifies your dataset, never writes inside it, and never replaces an existing file unless you pass <code>--overwrite</code>.</li><li>Tested on macOS with Python 3.10 and 3.14. Linux and Windows have not been tested.</li></ul>
+<p>It reports what it finds and you decide what to change. It makes no claim about training results.</p>
+<h2 id="free-tools-that-do-parts-of-this">Free tools that do parts of this</h2>
+<p>Ultralytics checks labels itself when training starts, FiftyOne can inspect and export datasets, and Datumaro can inspect, validate and convert them, and Roboflow has online dataset tools; use them when they fit your workflow.</p>
+<h2 id="what-the-full-edition-adds">What the full edition adds</h2>
+<p>The full edition reads COCO and Pascal VOC datasets as well, converts between the three formats with a read-back check, finds look-alike images that sit on both sides of a train and validation split, writes split lists and an HTML report, and includes a catalogue of faulty datasets and pytest fixtures. It costs 29 USD: <a href="https://labworkspace.gumroad.com/l/labelfence" rel="noreferrer">Labelfence on Gumroad</a>.</p>
+<p>In the lite edition the commands <code>dupes</code>, <code>split</code>, <code>convert</code> and <code>html-report</code> appear in <code>labelfence --help</code>; each prints a message that it belongs to the full edition and exits with code 2.</p>
+<p>The source of the lite edition is in the <a href="https://github.com/Lab-Work-Space/labelfence-lite" rel="noreferrer">labelfence-lite repository</a>, under the MIT licence.</p>
+</article>
+</div>
+</main>
+<footer class="titleblock">
+<div class="tb-brand"><a href="../"><strong>Labworkspace</strong></a></div>
+<div class="tb-sheet">developer tools for checking datasets and agent work</div>
+<nav class="tb-links" aria-label="Site"><a href="./">Labelfence</a> <a href="../crewlatch/">Crewlatch</a> <a href="../#guides">Guides</a> <a href="https://github.com/Lab-Work-Space" rel="noreferrer">Labworkspace on GitHub</a></nav>
+</footer>
+</div>
+</div>
+</body>
+</html>

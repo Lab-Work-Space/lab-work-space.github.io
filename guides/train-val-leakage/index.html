@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Near-duplicate images across train and val</title>
+<meta name="description" content="Train val leakage happens when near-duplicate images sit on both sides of a split, and it can inflate validation numbers. Why, and free ways to look.">
+<link rel="canonical" href="https://lab-work-space.github.io/guides/train-val-leakage/">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to the text</a>
+<div class="frame">
+<div class="sheet">
+<header class="sheethead"><a class="brand" href="../../">Labworkspace</a></header>
+<main id="content">
+<div class="column">
+<header class="pagehead"><div class="prose">
+<h1 id="near-duplicate-images-across-train-and-val">Near-duplicate images across train and val</h1>
+<p>A validation set is supposed to stand in for images the model has never seen. When a copy, or a near copy, of a training image is also in the validation set, the model is scored partly on what it has memorised, and the number says less than it appears to. This guide explains how that happens, gives a short script that finds exact copies, and says what it cannot find and what to use for that.</p>
+<p><strong>Before you start.</strong> The commands below need the free lite edition of Labelfence. The install is described on <a href="../../labelfence/#install">the Labelfence page</a>; it needs Python 3.10 or newer and git, and you run this line inside a virtual environment:</p>
+<pre tabindex="0"><code>pip install "git+https://github.com/Lab-Work-Space/labelfence-lite@v1.0.0"</code></pre>
+</div><figure class="drawing" role="img" aria-label="Line drawing: boxes inside an image frame, one dashed box leaving the frame, and one picture on both sides of a train and val fence."><svg viewBox="-4 0 600 420" aria-hidden="true" focusable="false"><rect x="40" y="30" width="420" height="270" fill="none" stroke="#8FA3B8" stroke-width="1.6"/><path d="M28 30 H52 M40 18 V42" stroke="#8FA3B8" stroke-width="1"/><path d="M448 30 H472 M460 18 V42" stroke="#8FA3B8" stroke-width="1"/><path d="M28 300 H52 M40 288 V312" stroke="#8FA3B8" stroke-width="1"/><path d="M448 300 H472 M460 288 V312" stroke="#8FA3B8" stroke-width="1"/><rect x="80" y="70" width="130" height="110" fill="none" stroke="#14213D" stroke-width="2.2"/><rect x="80" y="50" width="49" height="20" fill="#14213D"/><text x="88" y="65" font-family="'DIN Alternate', 'DIN 2014', Bahnschrift, 'Roboto Condensed', 'Arial Narrow', sans-serif" font-size="15" fill="#F3F5F7">cat</text><circle cx="210" cy="70" r="11" fill="#F3F5F7" stroke="#1F7A5C" stroke-width="2.2"/><path d="M205.4 70.2 l3.3 3.5 l6.1 -6.8" fill="none" stroke="#1F7A5C" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><rect x="250" y="150" width="110" height="120" fill="none" stroke="#14213D" stroke-width="2.2"/><rect x="250" y="130" width="49" height="20" fill="#14213D"/><text x="258" y="145" font-family="'DIN Alternate', 'DIN 2014', Bahnschrift, 'Roboto Condensed', 'Arial Narrow', sans-serif" font-size="15" fill="#F3F5F7">dog</text><circle cx="360" cy="150" r="11" fill="#F3F5F7" stroke="#1F7A5C" stroke-width="2.2"/><path d="M355.4 150.2 l3.3 3.5 l6.1 -6.8" fill="none" stroke="#1F7A5C" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><rect x="390" y="60" width="130" height="80" fill="none" stroke="#14213D" stroke-width="2.2" stroke-dasharray="7 6"/><path d="M500 142 L510 176" stroke="#8FA3B8" stroke-width="1" fill="none"/><text x="516" y="192" font-family="'DIN Alternate', 'DIN 2014', Bahnschrift, 'Roboto Condensed', 'Arial Narrow', sans-serif" font-size="15" fill="#8FA3B8" text-anchor="middle" letter-spacing="0.4">box leaves</text><text x="516" y="210" font-family="'DIN Alternate', 'DIN 2014', Bahnschrift, 'Roboto Condensed', 'Arial Narrow', sans-serif" font-size="15" fill="#8FA3B8" text-anchor="middle" letter-spacing="0.4">the image</text><path d="M260 324 V416" stroke="#14213D" stroke-width="2"/><path d="M254 330 H266" stroke="#14213D" stroke-width="1.4"/><path d="M254 344 H266" stroke="#14213D" stroke-width="1.4"/><path d="M254 358 H266" stroke="#14213D" stroke-width="1.4"/><path d="M254 372 H266" stroke="#14213D" stroke-width="1.4"/><path d="M254 386 H266" stroke="#14213D" stroke-width="1.4"/><path d="M254 400 H266" stroke="#14213D" stroke-width="1.4"/><path d="M254 414 H266" stroke="#14213D" stroke-width="1.4"/><rect x="150" y="350" width="70" height="48" fill="none" stroke="#14213D" stroke-width="1.8"/><path d="M158 388 l16 -18 l12 12 l10 -8 l16 14" fill="none" stroke="#8FA3B8" stroke-width="1.4"/><rect x="300" y="350" width="70" height="48" fill="none" stroke="#14213D" stroke-width="1.8"/><path d="M308 388 l16 -18 l12 12 l10 -8 l16 14" fill="none" stroke="#8FA3B8" stroke-width="1.4"/><path d="M224 370 H296 M224 378 H296" stroke="#8FA3B8" stroke-width="1.4"/><text x="185" y="340" font-family="'DIN Alternate', 'DIN 2014', Bahnschrift, 'Roboto Condensed', 'Arial Narrow', sans-serif" font-size="16" fill="#14213D" text-anchor="middle" letter-spacing="0.4">train</text><text x="335" y="340" font-family="'DIN Alternate', 'DIN 2014', Bahnschrift, 'Roboto Condensed', 'Arial Narrow', sans-serif" font-size="16" fill="#14213D" text-anchor="middle" letter-spacing="0.4">val</text><text x="392" y="372" font-family="'DIN Alternate', 'DIN 2014', Bahnschrift, 'Roboto Condensed', 'Arial Narrow', sans-serif" font-size="15" fill="#8FA3B8" text-anchor="start" letter-spacing="0.4">same picture</text><text x="392" y="390" font-family="'DIN Alternate', 'DIN 2014', Bahnschrift, 'Roboto Condensed', 'Arial Narrow', sans-serif" font-size="15" fill="#8FA3B8" text-anchor="start" letter-spacing="0.4">on both sides</text></svg></figure></header>
+<article class="prose">
+<h2 id="how-it-happens">How it happens</h2>
+<ul><li><strong>Video frames.</strong> Frames a fraction of a second apart are almost the same picture. Split the frames at random and most validation frames have a close neighbour in training.</li><li><strong>Augment, then split.</strong> If flipped, cropped or colour-shifted copies are written to disk before the split, the copies of one photograph land on both sides.</li><li><strong>Downloaded twice.</strong> The same picture collected from two searches, or from two sources, arrives under different file names and sometimes at different sizes.</li><li><strong>Merged datasets.</strong> Two public datasets can share images, and each keeps its own split.</li></ul>
+<p>The cheapest defence is the split itself: split by source, such as by video, by session or by camera, never by single image. The rest of this guide is for checking a split that already exists.</p>
+<h2 id="a-free-check-for-exact-copies">A free check for exact copies</h2>
+<p>Two files with the same bytes have the same SHA-256 hash. The script below reads every image of a dataset, groups the files by hash, and reports the groups that appear in more than one split. To try it, make a dataset with a clean audit and put a copy of one training image, with its label, into the validation folder:</p>
+<pre tabindex="0" class="command"><code>labelfence sample --out clean --case clean
+cp clean/images/train/img_000.jpg clean/images/val/copy_of_img_000.jpg
+cp clean/labels/train/img_000.txt clean/labels/val/copy_of_img_000.txt
+labelfence audit clean --quiet --report clean.json</code></pre>
+<pre tabindex="0" class="output"><code>Findings: 0 errors, 0 warnings</code></pre>
+<p>The audit is clean, because the lite edition does not look for duplicate images. Now the script:</p>
+<pre tabindex="0" class="command"><code>python3 - clean &lt;&lt;'PY'
+import collections, hashlib, pathlib, sys
+
+IMAGES = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".webp"}
+root = pathlib.Path(sys.argv[1])
+groups = collections.defaultdict(list)
+for path in sorted(root.rglob("*")):
+    if path.is_file() and path.suffix.lower() in IMAGES:
+        groups[hashlib.sha256(path.read_bytes()).hexdigest()].append(path)
+
+def split_of(path):
+    parts = path.relative_to(root).parts
+    return parts[1] if parts[0] == "images" and len(parts) &gt; 2 else parts[0]
+
+for paths in groups.values():
+    splits = {split_of(p) for p in paths}
+    if len(splits) &gt; 1:
+        print("identical bytes in", " and ".join(sorted(splits)))
+        for p in paths:
+            print(f"  {p.relative_to(root)}")
+PY</code></pre>
+<pre tabindex="0" class="output"><code>identical bytes in train and val
+  images/train/img_000.jpg
+  images/val/copy_of_img_000.jpg</code></pre>
+<p>It finds the copy. For your own data, replace <code>clean</code> with the dataset folder. The script treats the first folder under <code>images/</code> (or the top folder in the <code>&lt;split&gt;/images/</code> layout) as the split name, and it reads every file once.</p>
+<h2 id="what-exact-hashes-miss">What exact hashes miss</h2>
+<p>Change one pixel, resize the picture or save it again as a JPEG, and the hash is completely different. Here is a 90 percent resize of the same image, compared with the original:</p>
+<pre tabindex="0" class="command"><code>python3 - &lt;&lt;'PY'
+import hashlib, io
+from PIL import Image
+
+original = open("clean/images/train/img_000.jpg", "rb").read()
+image = Image.open(io.BytesIO(original))
+new_size = (image.width * 9 // 10, image.height * 9 // 10)
+smaller = io.BytesIO()
+image.resize(new_size).save(smaller, "JPEG")
+
+def digest(data):
+    return hashlib.sha256(data).hexdigest()
+
+print("same hash:", digest(original) == digest(smaller.getvalue()))
+PY</code></pre>
+<pre tabindex="0" class="output"><code>same hash: False</code></pre>
+<p>To the eye it is the same picture. Pillow, used here, is installed with Labelfence.</p>
+<h2 id="free-tools-for-near-duplicates">Free tools for near-duplicates</h2>
+<p>FiftyOne has a brain module that computes similarity between images and can flag exact and near duplicates in a dataset. cleanvision is an open-source package that audits an image collection for problems such as blurry, dark or near-duplicate images. Both have open-source editions, and both fit when you are already working with those tools.</p>
+<h2 id="what-the-full-edition-does">What the full edition does</h2>
+<p>The full edition of Labelfence computes perceptual hashes of every readable image and treats two images as near-duplicates when both hashes are close. It groups the images connected that way, raises a finding for every group whose images lie in two or more splits, and writes split lists in which each group stays together, so the problem does not come back with the next split. It costs 29 USD: <a href="https://labworkspace.gumroad.com/l/labelfence" rel="noreferrer">Labelfence on Gumroad</a>.</p>
+<p>It finds copies that were resized, re-encoded, shifted in brightness or contrast, or turned to grayscale. It does not find crops, mirrored copies or rotated copies; a slightly cropped or rotated copy is sometimes matched, and you should not rely on it. Different frames from a fixed camera, or of a static scene, can form a group too, because the hashes compare the coarse look of a picture and not what is in it, so look at the members of a group before you decide. No detection rate is stated, because none was measured on your images.</p>
+<h2 id="when-you-find-copies">When you find copies</h2>
+<p>Remove the copies from the validation set, not from training, and then split again by group so that the same pictures cannot return. Evaluate the model again afterwards, because any earlier validation number was measured on a set that included them. Keep a list of the files you moved, with the reason, so that the next person who rebuilds the dataset does not put them back by accident.</p>
+<p>Whatever tool you use, report the split method together with the validation number: by source, by single image, or by group. A reader can then judge what the number can mean.</p>
+<p>Next: <a href="../../labelfence/">the Labelfence page</a>, <a href="../check-yolo-dataset/">how to check a YOLO dataset before training</a>, and <a href="../bounding-box-formats/">bounding box formats</a>.</p>
+</article>
+</div>
+</main>
+<footer class="titleblock">
+<div class="tb-brand"><a href="../../"><strong>Labworkspace</strong></a></div>
+<div class="tb-sheet">developer tools for checking datasets and agent work</div>
+<nav class="tb-links" aria-label="Site"><a href="../../labelfence/">Labelfence</a> <a href="../../crewlatch/">Crewlatch</a> <a href="../../#guides">Guides</a> <a href="https://github.com/Lab-Work-Space" rel="noreferrer">Labworkspace on GitHub</a></nav>
+</footer>
+</div>
+</div>
+</body>
+</html>

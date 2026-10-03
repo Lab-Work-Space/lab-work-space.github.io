@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The YOLO label format, and the errors that break it</title>
+<meta name="description" content="The YOLO label format in one table, a worked example with numbers, and every way a label file goes wrong, with the Labelfence finding code and the fix for each.">
+<link rel="canonical" href="https://lab-work-space.github.io/guides/yolo-label-format-errors/">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to the text</a>
+<div class="frame">
+<div class="sheet">
+<header class="sheethead"><a class="brand" href="../../">Labworkspace</a></header>
+<main id="content">
+<div class="column">
+<article class="prose">
+<h1 id="the-yolo-label-format-and-the-errors-that-break-it">The YOLO label format, and the errors that break it</h1>
+<p>A YOLO label is a plain text file with one line per box. The format is short enough to learn in a minute, and many errors in a dataset are a line that breaks one of its rules. This guide gives the rules, one worked example, and then each error with the code that Labelfence lite reports for it and the fix.</p>
+<p><strong>Before you start.</strong> The commands below need the free lite edition of Labelfence. The install is described on <a href="../../labelfence/#install">the Labelfence page</a>; it needs Python 3.10 or newer and git, and you run this line inside a virtual environment:</p>
+<pre tabindex="0"><code>pip install "git+https://github.com/Lab-Work-Space/labelfence-lite@v1.0.0"</code></pre>
+<h2 id="the-format">The format</h2>
+<p>Each image has a label file with the same base name and the extension <code>.txt</code>. In the Ultralytics layout, <code>images/train/cat1.jpg</code> has the label <code>labels/train/cat1.txt</code>. An image with no boxes has an empty label file or none at all. Every line holds five numbers separated by single spaces:</p>
+<div class="table-wrap" role="region" aria-label="Table" tabindex="0"><table><thead><tr><th>Field</th><th>Meaning</th><th>Allowed values</th></tr></thead><tbody><tr><td>1</td><td>Class id</td><td>A whole number from 0 to <code>nc</code> minus 1</td></tr><tr><td>2</td><td>x centre of the box</td><td>0 to 1, as a fraction of the image width</td></tr><tr><td>3</td><td>y centre of the box</td><td>0 to 1, as a fraction of the image height</td></tr><tr><td>4</td><td>Width of the box</td><td>Above 0, up to 1, as a fraction of the image width</td></tr><tr><td>5</td><td>Height of the box</td><td>Above 0, up to 1, as a fraction of the image height</td></tr></tbody></table></div>
+<p>The class names live in <code>data.yaml</code>, in <code>nc</code> and <code>names</code>. The label file holds only the id, which is the position of the name in that list, counting from 0.</p>
+<h2 id="a-worked-example">A worked example</h2>
+<p>Take an image 640 pixels wide and 480 high. A cat is in the box whose left edge is at x 100, top edge at y 80, right edge at x 300 and bottom edge at y 280, all in pixels. The box is 200 pixels wide and 200 high. Its centre is at x 200 and y 180. Divide the x values by 640 and the y values by 480:</p>
+<pre tabindex="0" class="command"><code>python3 -c '
+W, H = 640, 480
+left, top, right, bottom = 100, 80, 300, 280
+xc, yc = (left + right) / 2 / W, (top + bottom) / 2 / H
+w, h = (right - left) / W, (bottom - top) / H
+print(f"0 {xc:.6f} {yc:.6f} {w:.6f} {h:.6f}")
+'</code></pre>
+<pre tabindex="0" class="output"><code>0 0.312500 0.375000 0.312500 0.416667</code></pre>
+<p>That line goes into the label file with class id 0. Six decimals are enough: on a 640 pixel image the rounding is below a thousandth of a pixel.</p>
+<h2 id="how-a-line-breaks">How a line breaks</h2>
+<p>Labelfence lite ships a synthetic dataset where every kind of error is present once. These commands write it and show line 2 of five of its label files:</p>
+<pre tabindex="0" class="command"><code>labelfence sample --out demo --case faulty
+for f in malformed outofrange badclass degenerate duplicate; do
+  echo "$f:"; sed -n 2p demo/labels/train/$f.txt
+done</code></pre>
+<pre tabindex="0" class="output"><code>malformed:
+0 0.5 0.5 0.2
+outofrange:
+0 0.5 0.5 1.2 0.2
+badclass:
+7 0.5 0.5 0.2 0.2
+degenerate:
+0 0.5 0.5 0.0 0.2
+duplicate:
+0 0.288660 0.539683 0.164948 0.412698</code></pre>
+<p>The first has four fields, the second a width of 1.2, the third a class id 7 in a dataset of four classes, the fourth a box with no width. The fifth repeats line 1. The audit names each of them, together with the others in the sample; these are some of its lines:</p>
+<pre tabindex="0" class="command"><code>labelfence audit demo</code></pre>
+<pre tabindex="0" class="output"><code>E_BOX_DEGENERATE (1): a box has no positive width or height
+E_BOX_OUT_OF_RANGE (1): a box value is outside the image or outside 0 to 1
+E_CLASS_ID_INVALID (1): a class id is not an integer, is negative, or is at least the class count
+E_DUPLICATE_BOX (1): a file holds two boxes with identical class and coordinates
+E_LABEL_MALFORMED (1): a label line has the wrong field count or a non-numeric field
+E_LABEL_MISSING_IMAGE (1): a label file has no image
+E_NAMES_MISMATCH (1): the category names disagree with the class list
+W_BOX_NEAR_DUPLICATE (1): two boxes of one class overlap almost completely
+W_BOX_TINY (1): a box is smaller than the minimum size
+W_IMAGE_WITHOUT_LABEL (1): an image has no label file (a background image)
+W_LABEL_EMPTY (1): a label file has no boxes</code></pre>
+<h2 id="each-error-and-its-fix">Each error and its fix</h2>
+<div class="table-wrap" role="region" aria-label="Table" tabindex="0"><table><thead><tr><th>Code</th><th>What is wrong</th><th>Fix</th></tr></thead><tbody><tr><td><code>E_LABEL_MALFORMED</code></td><td>The line does not have five fields, or a field is not a number</td><td>Rewrite the line. A segmentation label has many more numbers, and the lite edition reads it as a box only with <code>--allow-polygons</code></td></tr><tr><td><code>E_CLASS_ID_INVALID</code></td><td>The class id is negative, not a whole number, or not below the class count</td><td>Correct the id, or add the class to <code>names</code> and <code>nc</code></td></tr><tr><td><code>E_BOX_OUT_OF_RANGE</code></td><td>A value is outside 0 to 1 (including a negative width), usually because pixels were written instead of fractions, or the box leaves the image</td><td>Divide by the image size, or clip the box to the image</td></tr><tr><td><code>E_BOX_DEGENERATE</code></td><td>The width or the height is 0. A negative value is reported as <code>E_BOX_OUT_OF_RANGE</code></td><td>Delete the line or redraw the box</td></tr><tr><td><code>E_DUPLICATE_BOX</code></td><td>Two lines are identical</td><td>Delete one</td></tr><tr><td><code>W_BOX_NEAR_DUPLICATE</code></td><td>Two boxes of one class overlap almost completely: IoU of 0.95 or more</td><td>Keep one, unless two real objects are stacked</td></tr><tr><td><code>W_BOX_TINY</code></td><td>A side is under 2 pixels (change it with <code>--min-box-px</code>)</td><td>Check whether it is a real object or a mis-click</td></tr><tr><td><code>E_LABEL_MISSING_IMAGE</code></td><td>A label file has no image with the same base name</td><td>Restore the image, or delete the label</td></tr><tr><td><code>W_IMAGE_WITHOUT_LABEL</code></td><td>An image has no label file</td><td>Correct for a background image; otherwise label it</td></tr><tr><td><code>W_LABEL_EMPTY</code></td><td>A label file has no boxes</td><td>The same: background image, or unfinished work</td></tr><tr><td><code>E_NAMES_MISMATCH</code></td><td>The class names in <code>data.yaml</code> disagree with the class list, for example a name is listed twice</td><td>Make <code>names</code> and <code>nc</code> agree, with one name per class</td></tr></tbody></table></div>
+<p>An error means the training code would misread or drop the line. A warning means the data may be fine, and the choice is yours.</p>
+<h2 id="two-checks-by-hand">Two checks by hand</h2>
+<p>You can test the most common error without any tool. A line whose second field is above 1 was almost certainly written in pixels:</p>
+<pre tabindex="0" class="command"><code>printf '0 0.5 0.5 0.2 0.2\n0 320 240 128 96\n' &gt; labels.txt
+python3 - &lt;&lt;'PY'
+for line in open("labels.txt"):
+    if float(line.split()[1]) &gt; 1:
+        print("pixels, not fractions:", line.strip())
+PY</code></pre>
+<pre tabindex="0" class="output"><code>pixels, not fractions: 0 320 240 128 96</code></pre>
+<p>The same idea extends to every rule in the table, and Labelfence applies all of them to every file, and to the images, in one pass.</p>
+<h2 id="when-the-labels-come-from-another-format">When the labels come from another format</h2>
+<p>Labels exported from COCO or Pascal VOC need a conversion first, and the conventions differ in ways that produce the errors above. They are set out in <a href="../bounding-box-formats/">the guide to bounding box formats</a>.</p>
+<p>Next: <a href="../../labelfence/">the Labelfence page</a>, <a href="../check-yolo-dataset/">how to check a YOLO dataset before training</a>, and <a href="../bounding-box-formats/">bounding box formats</a>.</p>
+</article>
+</div>
+</main>
+<footer class="titleblock">
+<div class="tb-brand"><a href="../../"><strong>Labworkspace</strong></a></div>
+<div class="tb-sheet">developer tools for checking datasets and agent work</div>
+<nav class="tb-links" aria-label="Site"><a href="../../labelfence/">Labelfence</a> <a href="../../crewlatch/">Crewlatch</a> <a href="../../#guides">Guides</a> <a href="https://github.com/Lab-Work-Space" rel="noreferrer">Labworkspace on GitHub</a></nav>
+</footer>
+</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YOLO, COCO and Pascal VOC boxes: conventions and conversion</title>
+<meta name="description" content="COCO to YOLO bbox conversion, and back: how YOLO, COCO and Pascal VOC write the same box, worked on one box with plain Python you can copy.">
+<link rel="canonical" href="https://lab-work-space.github.io/guides/bounding-box-formats/">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to the text</a>
+<div class="frame">
+<div class="sheet">
+<header class="sheethead"><a class="brand" href="../../">Labworkspace</a></header>
+<main id="content">
+<div class="column">
+<article class="prose">
+<h1 id="yolo-coco-and-pascal-voc-bounding-boxes">YOLO, COCO and Pascal VOC bounding boxes</h1>
+<p>The three common detection formats describe the same rectangle with four numbers each, and the numbers mean different things. A converter that gets one convention wrong still produces a valid file, which is why the mistake can go unnoticed until a weak result after training. This guide sets out the conventions, writes one box in all three, and gives plain Python to convert it in both directions.</p>
+<h2 id="the-conventions">The conventions</h2>
+<div class="table-wrap" role="region" aria-label="Table" tabindex="0"><table><thead><tr><th></th><th>YOLO</th><th>COCO</th><th>Pascal VOC</th></tr></thead><tbody><tr><td>Four numbers</td><td>x centre, y centre, width, height</td><td>x and y of the top-left corner, width, height</td><td>xmin, ymin, xmax, ymax</td></tr><tr><td>Units</td><td>Fractions of the image size</td><td>Pixels</td><td>Pixels</td></tr><tr><td>Origin</td><td>Top-left of the image</td><td>Top-left; x and y are pixel coordinates from the corner</td><td>Top-left, counting from 1, both end pixels included (original devkit)</td></tr><tr><td>Class stored</td><td>First field of each line</td><td><code>category_id</code> in each annotation, names in <code>categories</code></td><td><code>name</code> of each <code>object</code></td></tr><tr><td>File</td><td>One <code>.txt</code> per image</td><td>One JSON file for a whole split</td><td>One XML file per image</td></tr></tbody></table></div>
+<p>The Pascal VOC development kit counts pixels from 1 and includes both end pixels, so a box over the first 100 pixels of a row is xmin 1 and xmax 100. Many tools that write VOC files count from 0 instead.</p>
+<h2 id="one-box-in-all-three-formats">One box in all three formats</h2>
+<p>Take an image 640 pixels wide and 480 high, and a box covering pixels 100 up to 300 across and 80 up to 280 down. It is 200 pixels wide and 200 high. In the three formats:</p>
+<ul><li>YOLO: <code>0 0.312500 0.375000 0.312500 0.416667</code>, where 0 is the class id.</li><li>COCO: <code>"bbox": [100, 80, 200, 200]</code>, with <code>"category_id"</code> beside it.</li><li>Pascal VOC: <code>xmin</code> 101, <code>ymin</code> 81, <code>xmax</code> 300, <code>ymax</code> 280, counting from 1.</li></ul>
+<h2 id="the-conversion">The conversion</h2>
+<p>Each function takes one box as a list. The image size is needed only for YOLO. The script below converts the example from YOLO to COCO to VOC and back, and prints the largest error in pixels:</p>
+<pre tabindex="0" class="command"><code>python3 - &lt;&lt;'PY'
+def yolo_to_coco(box, W, H):
+    xc, yc, w, h = box
+    return [(xc - w / 2) * W, (yc - h / 2) * H, w * W, h * H]
+
+def coco_to_yolo(box, W, H):
+    x, y, w, h = box
+    return [(x + w / 2) / W, (y + h / 2) / H, w / W, h / H]
+
+def coco_to_voc(box, one_based=True):
+    x, y, w, h = box
+    d = 1 if one_based else 0
+    return [x + d, y + d, x + w, y + h]
+
+def voc_to_coco(box, one_based=True):
+    xmin, ymin, xmax, ymax = box
+    d = 1 if one_based else 0
+    return [xmin - d, ymin - d, xmax - xmin + d, ymax - ymin + d]
+
+W, H = 640, 480
+yolo = [0.3125, 0.375, 0.3125, 0.416667]
+coco = yolo_to_coco(yolo, W, H)
+voc = coco_to_voc(coco)
+back = coco_to_yolo(voc_to_coco(voc), W, H)
+error = max(abs(a - b) * s for a, b, s in zip(yolo, back, (W, H, W, H)))
+print("yolo", " ".join(f"{v:.6f}" for v in yolo))
+print("coco", [round(v, 1) for v in coco])
+print("voc ", [round(v, 1) for v in voc])
+print(f"round trip error: {error:.3f} px")
+PY</code></pre>
+<pre tabindex="0" class="output"><code>yolo 0.312500 0.375000 0.312500 0.416667
+coco [100.0, 80.0, 200.0, 200.0]
+voc  [101.0, 81.0, 300.0, 280.0]
+round trip error: 0.000 px</code></pre>
+<p>The flag <code>one_based</code> is the Pascal VOC trap in one argument. For a tool that writes VOC counting from 0, call both VOC functions with <code>one_based=False</code>.</p>
+<h2 id="the-traps">The traps</h2>
+<ul><li><strong>Pascal VOC counted from 0 or from 1.</strong> Read one file you know and compare it with the image: a box on the first pixel row has ymin 1 in the original convention and ymin 0 in the other. Mixing them moves every box by one pixel, which does little to a large box and a lot to a small one.</li><li><strong>COCO category ids with gaps.</strong> The official COCO 2017 annotations number their 80 classes with ids from 1 to 90. YOLO wants a class id that is the position in a list starting at 0. Sort the ids from <code>categories</code> and number them in order; never subtract 1.</li><li><strong>YOLO rounding on small boxes.</strong> A label file holds decimals, and few decimals are not harmless on a small box. A box 3 pixels wide on a 640 pixel image:</li></ul>
+<pre tabindex="0" class="command"><code>python3 - &lt;&lt;'PY'
+W = 640
+for decimals in (3, 4, 6):
+    stored = round(3 / W, decimals)
+    px = stored * W
+    print(f"{decimals} decimals: 3 px is stored as {stored} = {px:.2f} px")
+PY</code></pre>
+<pre tabindex="0" class="output"><code>3 decimals: 3 px is stored as 0.005 = 3.20 px
+4 decimals: 3 px is stored as 0.0047 = 3.01 px
+6 decimals: 3 px is stored as 0.004687 = 3.00 px</code></pre>
+<p>Write at least six decimals.</p>
+<ul><li><strong>Images with an EXIF orientation.</strong> Many viewers turn a photo that carries an orientation tag, while its stored width and height, and the labels made on the stored pixels, stay as they were. Then the labels fit the pixels but not what you see, or the other way round. Labelfence reports it as <code>W_IMAGE_EXIF_ORIENTATION</code>; the fix is to apply the rotation to the pixels and drop the tag.</li></ul>
+<h2 id="whole-datasets">Whole datasets</h2>
+<p>A script like the one above is enough for a few boxes. For a whole dataset the work is the loop around it: reading every file, mapping class ids, writing the result and checking it. The full edition of Labelfence converts whole datasets between YOLO, COCO and Pascal VOC, and reads the result back and compares it with the source before it writes; it costs 29 USD: <a href="https://labworkspace.gumroad.com/l/labelfence" rel="noreferrer">Labelfence on Gumroad</a>.</p>
+<p>Next: <a href="../../labelfence/">the Labelfence page</a>, <a href="../yolo-label-format-errors/">the YOLO label format and its errors</a>, and <a href="../train-val-leakage/">near-duplicate images across train and val</a>.</p>
+</article>
+</div>
+</main>
+<footer class="titleblock">
+<div class="tb-brand"><a href="../../"><strong>Labworkspace</strong></a></div>
+<div class="tb-sheet">developer tools for checking datasets and agent work</div>
+<nav class="tb-links" aria-label="Site"><a href="../../labelfence/">Labelfence</a> <a href="../../crewlatch/">Crewlatch</a> <a href="../../#guides">Guides</a> <a href="https://github.com/Lab-Work-Space" rel="noreferrer">Labworkspace on GitHub</a></nav>
+</footer>
+</div>
+</div>
+</body>
+</html>

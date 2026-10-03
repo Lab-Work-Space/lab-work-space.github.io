@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How to check a YOLO dataset before training</title>
+<meta name="description" content="Check YOLO dataset labels and images before training: the mistakes that waste a run, a free command-line audit, and how to run it in CI.">
+<link rel="canonical" href="https://lab-work-space.github.io/guides/check-yolo-dataset/">
+<link rel="stylesheet" href="../../assets/site.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to the text</a>
+<div class="frame">
+<div class="sheet">
+<header class="sheethead"><a class="brand" href="../../">Labworkspace</a></header>
+<main id="content">
+<div class="column">
+<header class="pagehead"><div class="prose">
+<h1 id="how-to-check-a-yolo-dataset-before-training">How to check a YOLO dataset before training</h1>
+<p>A training run on a detection dataset can take hours, and a bad label does not stop it. This guide lists what usually goes wrong in a YOLO dataset, then walks through a free audit that lists those problems in one pass and exits with a code your scripts can test.</p>
+<p><strong>Before you start.</strong> The commands below need the free lite edition of Labelfence. The install is described on <a href="../../labelfence/#install">the Labelfence page</a>; it needs Python 3.10 or newer and git, and you run this line inside a virtual environment:</p>
+<pre tabindex="0"><code>pip install "git+https://github.com/Lab-Work-Space/labelfence-lite@v1.0.0"</code></pre>
+</div><figure class="drawing" role="img" aria-label="Line drawing: boxes inside an image frame, one dashed box leaving the frame, and one picture on both sides of a train and val fence."><svg viewBox="-4 0 600 420" aria-hidden="true" focusable="false"><rect x="40" y="30" width="420" height="270" fill="none" stroke="#8FA3B8" stroke-width="1.6"/><path d="M28 30 H52 M40 18 V42" stroke="#8FA3B8" stroke-width="1"/><path d="M448 30 H472 M460 18 V42" stroke="#8FA3B8" stroke-width="1"/><path d="M28 300 H52 M40 288 V312" stroke="#8FA3B8" stroke-width="1"/><path d="M448 300 H472 M460 288 V312" stroke="#8FA3B8" stroke-width="1"/><rect x="80" y="70" width="130" height="110" fill="none" stroke="#14213D" stroke-width="2.2"/><rect x="80" y="50" width="49" height="20" fill="#14213D"/><text x="88" y="65" font-family="'DIN Alternate', 'DIN 2014', Bahnschrift, 'Roboto Condensed', 'Arial Narrow', sans-serif" font-size="15" fill="#F3F5F7">cat</text><circle cx="210" cy="70" r="11" fill="#F3F5F7" stroke="#1F7A5C" stroke-width="2.2"/><path d="M205.4 70.2 l3.3 3.5 l6.1 -6.8" fill="none" stroke="#1F7A5C" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><rect x="250" y="150" width="110" height="120" fill="none" stroke="#14213D" stroke-width="2.2"/><rect x="250" y="130" width="49" height="20" fill="#14213D"/><text x="258" y="145" font-family="'DIN Alternate', 'DIN 2014', Bahnschrift, 'Roboto Condensed', 'Arial Narrow', sans-serif" font-size="15" fill="#F3F5F7">dog</text><circle cx="360" cy="150" r="11" fill="#F3F5F7" stroke="#1F7A5C" stroke-width="2.2"/><path d="M355.4 150.2 l3.3 3.5 l6.1 -6.8" fill="none" stroke="#1F7A5C" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><rect x="390" y="60" width="130" height="80" fill="none" stroke="#14213D" stroke-width="2.2" stroke-dasharray="7 6"/><path d="M500 142 L510 176" stroke="#8FA3B8" stroke-width="1" fill="none"/><text x="516" y="192" font-family="'DIN Alternate', 'DIN 2014', Bahnschrift, 'Roboto Condensed', 'Arial Narrow', sans-serif" font-size="15" fill="#8FA3B8" text-anchor="middle" letter-spacing="0.4">box leaves</text><text x="516" y="210" font-family="'DIN Alternate', 'DIN 2014', Bahnschrift, 'Roboto Condensed', 'Arial Narrow', sans-serif" font-size="15" fill="#8FA3B8" text-anchor="middle" letter-spacing="0.4">the image</text><path d="M260 324 V416" stroke="#14213D" stroke-width="2"/><path d="M254 330 H266" stroke="#14213D" stroke-width="1.4"/><path d="M254 344 H266" stroke="#14213D" stroke-width="1.4"/><path d="M254 358 H266" stroke="#14213D" stroke-width="1.4"/><path d="M254 372 H266" stroke="#14213D" stroke-width="1.4"/><path d="M254 386 H266" stroke="#14213D" stroke-width="1.4"/><path d="M254 400 H266" stroke="#14213D" stroke-width="1.4"/><path d="M254 414 H266" stroke="#14213D" stroke-width="1.4"/><rect x="150" y="350" width="70" height="48" fill="none" stroke="#14213D" stroke-width="1.8"/><path d="M158 388 l16 -18 l12 12 l10 -8 l16 14" fill="none" stroke="#8FA3B8" stroke-width="1.4"/><rect x="300" y="350" width="70" height="48" fill="none" stroke="#14213D" stroke-width="1.8"/><path d="M308 388 l16 -18 l12 12 l10 -8 l16 14" fill="none" stroke="#8FA3B8" stroke-width="1.4"/><path d="M224 370 H296 M224 378 H296" stroke="#8FA3B8" stroke-width="1.4"/><text x="185" y="340" font-family="'DIN Alternate', 'DIN 2014', Bahnschrift, 'Roboto Condensed', 'Arial Narrow', sans-serif" font-size="16" fill="#14213D" text-anchor="middle" letter-spacing="0.4">train</text><text x="335" y="340" font-family="'DIN Alternate', 'DIN 2014', Bahnschrift, 'Roboto Condensed', 'Arial Narrow', sans-serif" font-size="16" fill="#14213D" text-anchor="middle" letter-spacing="0.4">val</text><text x="392" y="372" font-family="'DIN Alternate', 'DIN 2014', Bahnschrift, 'Roboto Condensed', 'Arial Narrow', sans-serif" font-size="15" fill="#8FA3B8" text-anchor="start" letter-spacing="0.4">same picture</text><text x="392" y="390" font-family="'DIN Alternate', 'DIN 2014', Bahnschrift, 'Roboto Condensed', 'Arial Narrow', sans-serif" font-size="15" fill="#8FA3B8" text-anchor="start" letter-spacing="0.4">on both sides</text></svg></figure></header>
+<article class="prose">
+<h2 id="what-goes-wrong-in-practice">What goes wrong in practice</h2>
+<ul><li>A label file has no image, or an image has no label file. Renaming or filtering one folder and not the other is a common cause.</li><li>A class id is at or above <code>nc</code>, the class count in <code>data.yaml</code>, or it is negative or not a whole number.</li><li>A box lies partly or wholly outside the image, so one of its four numbers is below 0 or above 1.</li><li>A label line has the wrong number of fields. Every line needs exactly five: class, x centre, y centre, width, height.</li><li>A label file is empty, or holds the same box twice.</li><li>There is no validation split, so the numbers you read after training are measured on nothing.</li></ul>
+<p>The format and the rules behind each of these are in <a href="../yolo-label-format-errors/">the guide to the YOLO label format</a>.</p>
+<p>Ultralytics reports many label problems as warnings while it builds its cache. A warning in the middle of a long training log is easy to miss, and it tells you about the files it met, not about the dataset as a whole. An audit before training gives you the full list in one place.</p>
+<h2 id="audit-a-dataset">Audit a dataset</h2>
+<p>To follow along without your own data, Labelfence writes a small synthetic dataset that holds one example of every code the lite edition reports:</p>
+<pre tabindex="0" class="command"><code>labelfence sample --out demo --case faulty</code></pre>
+<p>Audit it. The command prints a summary and the findings grouped by code, and writes <code>demo-audit.json</code> next to where you ran it:</p>
+<pre tabindex="0" class="command"><code>labelfence audit demo</code></pre>
+<p>Part of what it prints:</p>
+<pre tabindex="0" class="output"><code>Labelfence 1.0.0: demo
+Format: yolo (layout: ultralytics)
+Images: 23  Boxes: 91  Classes: 4
+Findings: 9 errors, 12 warnings
+  E_LABEL_MALFORMED: 1
+  W_SPLIT_MISSING: 1</code></pre>
+<p>The first lines say what it read: the layout it detected, how many images and boxes, and how many classes <code>data.yaml</code> declares. The <code>Findings</code> line counts errors and warnings. Codes starting with <code>E_</code> are errors and codes starting with <code>W_</code> are warnings. Below the summary, every code gets a heading, a count and the first files and lines it was found in.</p>
+<p>On a dataset with errors the exit code is 3. That is the signal, and it is the expected result here.</p>
+<h2 id="fix-by-code">Fix by code</h2>
+<p>Start with the errors, then read the warnings and decide which matter for your data.</p>
+<div class="table-wrap" role="region" aria-label="Table" tabindex="0"><table><thead><tr><th>Code</th><th>What it means</th><th>What to do</th></tr></thead><tbody><tr><td><code>E_LABEL_MISSING_IMAGE</code></td><td>A label file has no image</td><td>Restore the image or delete the label file</td></tr><tr><td><code>E_LABEL_MALFORMED</code></td><td>A line has the wrong field count or a non-numeric field</td><td>Open the file at the line shown and correct it</td></tr><tr><td><code>E_CLASS_ID_INVALID</code></td><td>A class id is not below the class count</td><td>Fix the id, or the class list in <code>data.yaml</code></td></tr><tr><td><code>E_BOX_OUT_OF_RANGE</code></td><td>A box value is outside 0 to 1</td><td>Clip the box to the image, or re-export the labels</td></tr><tr><td><code>E_IMAGE_UNREADABLE</code></td><td>The image header is missing or cut off, or the file is not an image</td><td>Replace the file</td></tr><tr><td><code>W_LABEL_EMPTY</code></td><td>A label file has no boxes</td><td>Fine for a background image; otherwise label it</td></tr><tr><td><code>W_SPLIT_MISSING</code></td><td>There is no validation split</td><td>Create one before you trust any metric</td></tr></tbody></table></div>
+<p>Other codes and fixes are in <a href="../yolo-label-format-errors/">the guide to the YOLO label format</a>. Labelfence never changes your dataset, so fixing is your decision. Run the audit again after each round of changes.</p>
+<h2 id="use-it-in-ci">Use it in CI</h2>
+<p><code>--strict</code> turns warnings into exit code 3 as well, and <code>--quiet</code> prints the summary only. A clean dataset passes, and the faulty one does not:</p>
+<pre tabindex="0" class="command"><code>labelfence sample --out clean --case clean
+labelfence audit clean --strict --quiet --report clean.json &gt; /dev/null 2&gt;&amp;1
+echo "clean: exit code $?"
+labelfence audit demo --strict --quiet --report strict.json &gt; /dev/null 2&gt;&amp;1
+echo "demo: exit code $?"</code></pre>
+<pre tabindex="0" class="output"><code>clean: exit code 0
+demo: exit code 3</code></pre>
+<p>In a CI job the line to add is <code>labelfence audit path/to/dataset --strict --quiet --report audit.json</code>. A step that exits with 3 fails the job, and the JSON report is there to attach as an artifact. The other exit codes are 2 for a usage error and 5 for input that is not a dataset.</p>
+<h2 id="look-at-the-balance">Look at the balance</h2>
+<p><code>labelfence stats</code> prints counts per split and per class without running the checks:</p>
+<pre tabindex="0" class="command"><code>labelfence stats demo</code></pre>
+<pre tabindex="0" class="output"><code>Labelfence 1.0.0: demo
+Images: 23  Boxes: 91  Classes: 4
+  class 0 cat: 76 boxes (83.5%)
+  class 3 fish: 0 boxes (0.0%)</code></pre>
+<p>A class with almost no boxes, or none, shows here before it shows up as a weak result after training. The audit raises it as <code>W_CLASS_IMBALANCE</code> and <code>W_CLASS_UNUSED</code>.</p>
+<h2 id="what-the-lite-edition-leaves-out">What the lite edition leaves out</h2>
+<p>The lite edition reads YOLO datasets only, and it does not look for images that appear in more than one split. If your data is in COCO or Pascal VOC format, or you suspect look-alike images on both sides of the train and validation split, the full edition adds both, and costs 29 USD: <a href="https://labworkspace.gumroad.com/l/labelfence" rel="noreferrer">Labelfence on Gumroad</a>.</p>
+<p>Next: <a href="../../labelfence/">the Labelfence page</a>, <a href="../yolo-label-format-errors/">the YOLO label format and its errors</a>, and <a href="../train-val-leakage/">near-duplicate images across train and val</a>.</p>
+</article>
+</div>
+</main>
+<footer class="titleblock">
+<div class="tb-brand"><a href="../../"><strong>Labworkspace</strong></a></div>
+<div class="tb-sheet">developer tools for checking datasets and agent work</div>
+<nav class="tb-links" aria-label="Site"><a href="../../labelfence/">Labelfence</a> <a href="../../crewlatch/">Crewlatch</a> <a href="../../#guides">Guides</a> <a href="https://github.com/Lab-Work-Space" rel="noreferrer">Labworkspace on GitHub</a></nav>
+</footer>
+</div>
+</div>
+</body>
+</html>
